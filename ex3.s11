@@ -35,7 +35,7 @@ main:		mov pc, sp				;start a stack
 			mov nCols, -(sp)
 			mov #Hash, -(sp)
 			jsr pc, system
-			cmp (sp)+, (sp)+		;poping the stack - 5 inputs in stack and 0 outputs - 5 pops
+			cmp (sp)+, (sp)+		;popping the stack - 5 inputs in stack and 0 outputs - 5 pops
 			cmp (sp)+, (sp)+
 			tst (sp)+
 			br finish				;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
@@ -57,8 +57,8 @@ checkNext:	jsr pc, nextKey			;calling nextKey
 			clr -2(sp)
 			movb nCols, -(sp)
 			jsr pc, cmpImg
-			tst (sp)+, (sp)+		;poping the stack (inputs)
-			tst (sp)+, (sp)+
+			cmp (sp)+, (sp)+		;popping the stack (inputs)
+			cmp (sp)+, (sp)+
 			tst (sp)+
 						
 			beq systemFin			;if identical jump to finish
@@ -71,10 +71,10 @@ systemFin:	mov (sp)+, r1			;restoring r1
 			halt					;done
 			
 
-nextKey:	mov r2, -(sp)			;pushing the content of r2 to the stack
+nextKey:		mov r2, -(sp)			;pushing the content of r2 to the stack
 			mov r1, -(sp)			;pushing the address of the key to the stack
 			jsr pc, recurseKey		;calling recurseKey
-			tst (sp)+				;poping 
+			tst (sp)+				;popping 
 			mov (sp)+, r2			;restoring the content of r2 from the stack
 recurseKey:	cmp @2(sp), #17			
 			beq nextCall			;if the key element equals 17 go to nextCall
@@ -87,9 +87,54 @@ nextCall:	mov 0, @2(sp)			;key element = 0
 			jsr pc, recurseKey		;calling nextCall (recursion)
 finishKey:	rts pc					;return from recurseKey
 		
+cmpImg:		mov r0, -(sp)			;the picture isn't empty
+			mov r1, -(sp)
+			mov r2, -(sp) 			;saving register values in stack
+			mov 8(sp), r0 			;columns to register r0 - assuming that was saved in words
+			mov 10(sp), r1			;rows to register r1 - assuming that was saved in words
+			mul r1, r0				;number of bytes saved in r0
+			mov 14(sp), r1			;first picture address in r1
+			mov 12(sp), r2			;second picture address in r2
+cmpImgLoop:	cmpb (r1),(r2)			;comparing two bytes in a picture
+			bne notSameImg			
+			dec r0
+			beq sameImg
+			cmpb (r1)+, (r2)+ 		;dummy just to advance the pointer to the next bytes of the picture
+			br cmpImgLoop
+notSameImg:	mov #1, 16(sp)			;output returns in stack
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0			;restoring registers
+			rts pc
+sameImg:		mov #0, 16(sp)			;output returns in stack
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0			;restoring registers
+			rts pc
 
-;cmpImg:
-		
+isLegal:		mov r0, -(sp)			;the picture isn't empty
+			mov r1, -(sp)
+			mov r2, -(sp) 			;saving register values in stack
+			mov (r5)+, r2			;picture's address moved to register r2 
+			mov (r5)+, r0 			;rows passing to r0 - assuming that was saved in words
+			mov (r5)+, r1			;columns passing to r1 - assuming that was saved in words
+			mul r1, r0 				
+isLegalLoop:	cmpb (r2)+, #15
+			bpl notLegal
+			dec r0
+			beq legal
+			br isLegalLoop
+notLegal:	mov #0, (r5)+			;note that here 0 in returned when the picture is notLegal
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0 			;restoring registers
+			rts r5
+legal:   	mov #1, (r5)+			;returning 1 when legal
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0			;restoring registers
+			rts r5
+			
 finish:		halt
 		
 		
