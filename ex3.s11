@@ -120,9 +120,9 @@ isLegal:		mov r0, -(sp)			;the picture isn't empty
 			mov (r5)+, r1			;columns passing to r1 - assuming that was saved in words
 			mul r1, r0 				
 isLegalLoop:	cmpb (r2)+, #15
-			bpl notLegal
+			bpl notLegal				;branch if bigger then 15 or smaller then 0
 			dec r0
-			beq legal
+			beq legal				;branch if r0 is 0 - picture is all scanned
 			br isLegalLoop
 notLegal:	mov #0, (r5)+			;note that here 0 in returned when the picture is notLegal
 			mov (sp)+, r2
