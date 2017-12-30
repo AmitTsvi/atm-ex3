@@ -1,0 +1,112 @@
+. = torg + 5000
+ 
+		
+main:		mov pc, sp				;start a stack
+			tst -(sp)
+			
+			;checks if the input is an empty picture
+			tstb nCols				
+			beq finish
+			tstb nRows
+			beq finish
+			
+			;checking the two input images
+			clr r2
+			movb nRows, r2
+			clr r3
+			movb nCols, r3
+			jsr r5, isLegal			;calling isLegal
+			mov #OrigImg, -6(pc)	;passing address of original image to be tested (inline)
+			mov r2, -10(pc)			;passing number of rows (inline)
+			mov r3, -12(pc)			;passing number of columns (inline)
+			tst -14(pc)		
+			bne finish				;if isLegal result != 0 than exit
+			jsr r5, isLegal			;calling isLegal
+			mov #EncImg, -6(pc)		;passing address of encrypted image to be tested (inline)
+			mov r2, -10(pc)			;passing number of rows (inline)
+			mov r3, -12(pc)			;passing number of columns (inline)
+			tst -14(pc)
+			bne finish				;if isLegal result != 0 than exit
+			
+			;finding the correct key (using system subroutine
+			mov #OrigImg, -(sp)		;passing arguments in stack to system
+			mov #EncImg, -(sp)
+			mov nRows, -(sp)
+			mov nCols, -(sp)
+			mov #Hash, -(sp)
+			jsr pc, system
+			cmp (sp)+, (sp)+		;poping the stack - 5 inputs in stack and 0 outputs - 5 pops
+			cmp (sp)+, (sp)+
+			tst (sp)+
+			br finish				;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
+			
+			
+system:		mov r1, -(sp)			;saving r1 original value on stack
+			mov #Key, r1			;moving the address Key to r1
+checkNext:	jsr pc, nextKey			;calling nextKey
+
+			;encrypting the original image
+			
+			
+			;comparing the new encrypted image to the input encrypted image
+			mov #0, -(sp)			;space for cmpImg result
+			mov #OrigImg, -(sp)
+			mov #EncImg, -(sp)
+			clr -2(sp)
+			movb nRows, -(sp)
+			clr -2(sp)
+			movb nCols, -(sp)
+			jsr pc, cmpImg
+			tst (sp)+, (sp)+		;poping the stack (inputs)
+			tst (sp)+, (sp)+
+			tst (sp)+
+						
+			beq systemFin			;if identical jump to finish
+			
+			;decrypting the new encrypted image
+			
+			br checkNext
+			
+systemFin:	mov (sp)+, r1			;restoring r1
+			halt					;done
+			
+
+nextKey:	mov r2, -(sp)			;pushing the content of r2 to the stack
+			mov r1, -(sp)			;pushing the address of the key to the stack
+			jsr pc, recurseKey		;calling recurseKey
+			tst (sp)+				;poping 
+			mov (sp)+, r2			;restoring the content of r2 from the stack
+recurseKey:	cmp @2(sp), #17			
+			beq nextCall			;if the key element equals 17 go to nextCall
+			inc @2(sp)				;if the key element does no equal 17 simply add 1
+			br finishKey			;go to finishKey
+nextCall:	mov 0, @2(sp)			;key element = 0
+			mov 2(sp), r2			;copy the address of the current key element to r2
+			add #2, r2				;add 2 to r2 - now r2 contains the address of the address of the adress of the next key element
+			mov (r2), -(sp)			;push the address of the next key element
+			jsr pc, recurseKey		;calling nextCall (recursion)
+finishKey:	rts pc					;return from recurseKey
+		
+
+;cmpImg:
+		
+finish:		halt
+		
+		
+.= torg + 11000
+nCols: 		.byte 10
+nRows: 	.byte 4
+OrigImg: 	.byte	 1,  2,  1,  2, 0,   1,   2,    3 
+				.byte	 3,  4,  3,  4, 4,   5,   6,    7
+				.byte	 5,  6,  5,  6, 10, 11, 12, 13
+				.byte	 7,  0,  7,  0, 14, 15, 16, 17
+EncImg: 	.byte	 3,  4,  3,  4,  2,  3,   4,    5 
+				.byte	 7,  4,  7,  4,  10,   7,   6,    11
+				.byte	 7,  10,  7,  10, 14, 15, 12, 13
+				.byte	 3,  10,  3,  10, 16, 1, 0, 17
+Hash:		.byte 	2,3,4,5,6,7,10,11,12,13,14,15,16,17,0,1
+.even
+Key:		
+node1:		.word -1, node2
+node2:		.word -1, node3
+node3:		.word -1, 0
