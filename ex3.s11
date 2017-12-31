@@ -6,11 +6,15 @@ main:		mov pc, sp				;start a stack
 			
 			;checks if the input is an empty picture
 			tstb nCols				
-			beq finish
-			tstb nRows
-			beq finish
+			bgt chkRows
+			jmp @#finish
+chkRows:	tstb nRows
+			bgt continue
+			jmp @#finish
+	
+
 			
-			;checking the two input images
+continue:	;checking the two input images
 			clr r2
 			movb nRows, r2
 			clr r3
@@ -20,16 +24,18 @@ main:		mov pc, sp				;start a stack
 			mov r2, -10(pc)			;passing number of rows (inline)
 			mov r3, -12(pc)			;passing number of columns (inline)
 			tst -14(pc)		
-			bne finish				;if isLegal result != 0 than exit
-			jsr r5, isLegal			;calling isLegal
+			beq chkEncImg			;if isLegal result != 0 then exit
+			jmp @#finish
+chkEncImg:	jsr r5, isLegal			;calling isLegal
 			mov #EncImg, -6(pc)		;passing address of encrypted image to be tested (inline)
 			mov r2, -10(pc)			;passing number of rows (inline)
 			mov r3, -12(pc)			;passing number of columns (inline)
 			tst -14(pc)
-			bne finish				;if isLegal result != 0 than exit
+			beq imgsAreOk			;if isLegal result != 0 then exit
+			jmp @#finish
 			
-			;finding the correct key (using system subroutine
-			mov #OrigImg, -(sp)		;passing arguments in stack to system
+			;finding the correct key (using system subroutine nextKey)
+imgsAreOk:	mov #OrigImg, -(sp)		;passing arguments in stack to system
 			mov #EncImg, -(sp)
 			mov nRows, -(sp)
 			mov nCols, -(sp)
@@ -38,7 +44,7 @@ main:		mov pc, sp				;start a stack
 			cmp (sp)+, (sp)+		;popping the stack - 5 inputs in stack and 0 outputs - 5 pops
 			cmp (sp)+, (sp)+
 			tst (sp)+
-			br finish				;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
+			halt					;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
 			
 			
 system:		mov r1, -(sp)			;saving r1 original value on stack
@@ -61,7 +67,7 @@ checkNext:	jsr pc, nextKey			;calling nextKey
 			cmp (sp)+, (sp)+
 			tst (sp)+
 						
-			beq systemFin			;if identical jump to finish
+			beq systemFin			;if identical jump to systemfinish
 			
 			;decrypting the new encrypted image
 			
