@@ -15,27 +15,29 @@ chkRows:	tstb nRows
 
 			
 continue:	;checking the two input images
+			clr r1
+			mov #OrigImg, r1
 			clr r2
 			movb nRows, r2
 			clr r3
 			movb nCols, r3
+			mov #2, r4
+checkImg2:	mov r1, 14(pc)	;passing address of original image to be tested (inline)
+			mov r2, 12(pc)			;passing number of rows (inline)
+			mov r3, 10(pc)			;passing number of columns (inline)
 			jsr r5, isLegal			;calling isLegal
-			mov #OrigImg, -6(pc)	;passing address of original image to be tested (inline)
-			mov r2, -10(pc)			;passing number of rows (inline)
-			mov r3, -12(pc)			;passing number of columns (inline)
-			tst -14(pc)		
+			.word 0
+			.word 0
+			.word 0
+			.word 0					;place for result
+			tst -6(pc)		
 			beq chkEncImg			;if isLegal result != 0 then exit
 			jmp @#finish
-chkEncImg:	jsr r5, isLegal			;calling isLegal
-			mov #EncImg, -6(pc)		;passing address of encrypted image to be tested (inline)
-			mov r2, -10(pc)			;passing number of rows (inline)
-			mov r3, -12(pc)			;passing number of columns (inline)
-			tst -14(pc)
-			beq imgsAreOk			;if isLegal result != 0 then exit
-			jmp @#finish
+chkEncImg:	mov #EncImg, r1
+			sob r4, checkImg2
 			
 			;finding the correct key (using system subroutine nextKey)
-imgsAreOk:	mov #OrigImg, -(sp)		;passing arguments in stack to system
+			mov #OrigImg, -(sp)		;passing arguments in stack to system
 			mov #EncImg, -(sp)
 			mov nRows, -(sp)
 			mov nCols, -(sp)
@@ -124,18 +126,20 @@ isLegal:		mov r0, -(sp)			;the picture isn't empty
 			mov (r5)+, r2			;picture's address moved to register r2 
 			mov (r5)+, r0 			;rows passing to r0 - assuming that was saved in words
 			mov (r5)+, r1			;columns passing to r1 - assuming that was saved in words
-			mul r1, r0 				
-isLegalLoop:	cmpb (r2)+, #15
-			bpl notLegal				;branch if bigger then 15 or smaller then 0
-			dec r0
+			mul r0, r1				;IT WAS "mul r1, r0" AND BECAUSE THE RESULT REGISTER WAS EVEN (0) THE RESULT WILL BE SPREAD INTO 2 REGISTERS WHEN R1 IS THE LOWER PART				
+isLegalLoop:cmpb (r2), #17			;IT WAS #15 AND THE NUMBERS HERE ARE IN OCTAL SO SHOULD BE #17
+			bgt notLegal			;branch if bigger then 15 or smaller then 0 ;BPL IS A FLAG BRANCH SO I WORRIED ABOUT SOME PROBLEM, BGT IS SAME BUT HAVE DESCRIPTION IN THE TUTORIAL
+			tstb (r2)+				;THE INCREATE IN R2 MOVED HERE FROM LINE 130
+			blt notLegal			;CHECK THE PART OF SMALLER THAN ZERO
+			dec r1					;DECREASE R1 INSTEAD OF R0 BECAUSE OF THE CHANGE IN MUL
 			beq legal				;branch if r0 is 0 - picture is all scanned
 			br isLegalLoop
-notLegal:	mov #0, (r5)+			;note that here 0 in returned when the picture is notLegal
+notLegal:	mov #1, (r5)+			;note that here 1 in returned when the picture is notLegal ;0 IS FOR LEGAL AND 1 IS FOR NOT LEGAL
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0 			;restoring registers
 			rts r5
-legal:   	mov #1, (r5)+			;returning 1 when legal
+legal:   	mov #0, (r5)+			;returning 0 when legal
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
