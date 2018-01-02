@@ -1,10 +1,16 @@
 . = torg + 5000
  
-		
+;**********************main routine******************************
+;steps: 
+;		initiate the stack
+;		check that the images have valid dimentions
+;		check that the image's bytes have legal values
+;		find the correct encryption key that was used to encrypt OrigImg to EncImg
 main:		mov pc, sp				;start a stack
 			tst -(sp)
-			
-			;"Check Image Dimensions" - checks that the image have positive dimensisons.
+	
+	
+;"Check Image Dimensions" - checks that the image have positive dimensisons.
 			tstb nCols				
 			bgt chkRows				;continue only if the number of rows is greater than 0
 			jmp @#finish
@@ -12,9 +18,8 @@ chkRows:	tstb nRows
 			bgt continue			;continue only if the number of columns is greater than 0
 			jmp @#finish
 	
-
-			
-			;"Using isLegal" - checks that the two input images have leagal byte values (0-17).
+	
+;"Using isLegal" - checks that the two input images have leagal byte values (0-17).
 continue:	clr r1
 			mov #OrigImg, r1
 			clr r2
@@ -36,7 +41,8 @@ checkImg2:	mov r1, 14(pc)			;passing address the image to be tested (inline)
 chkEncImg:	mov #EncImg, r1			;switch the address in r1 to the address of the encrypted image
 			sob r4, checkImg2
 			
-			;"Using system" - finding the correct key using system subroutine
+			
+;"Using system" - finding the correct key using system subroutine
 			mov #OrigImg, -(sp)		;passing arguments in stack to system
 			mov #EncImg, -(sp)
 			clr -2(sp)
@@ -49,26 +55,29 @@ chkEncImg:	mov #EncImg, r1			;switch the address in r1 to the address of the enc
 			cmp (sp)+, (sp)+
 			tst (sp)+
 			halt					;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
+;****************************************************************
 
 
 
-
-
-
-			
-			;"System" (Procedure) - finds the key that was used to encrypt OrigImg the made EncImg.
-			;inputs - address of the original image - in stack
+;**********************System routine****************************
+;steps:			
+		;finds the key that was used to encrypt OrigImg that made EncImg.
+;inputs: 
+			;		- address of the original image - in stack
 			;		- address of encrypted image - in stack
 			;		- number of rows in the image - in stack
 			;		- number of columns in the image - in stack
 			;		- address of the scrumbling function used in the proccess of encryption of original image
 			;		- address of the start of key's list - in common area
-			;outputs- result key - writen in the list that was passed as input in common area
+;outputs:
+			;		- result key - writen in the list that was passed as input in common area
+;registers in use:
+			;		- r1
 system:		mov r1, -(sp)			;saving r1 original value on stack
 			mov #Key, r1			;moving the address Key to r1
 checkNext:	jsr pc, nextKey			;calling nextKey
 
-			;"Encrypt" - encrypting the original image
+;"Encrypt" - encrypting the original image using encrypt routine
 			mov 14(sp), -(sp)		;address of the original picture
 			mov 12(sp), -(sp)		;number of rows
 			mov 12(sp), -(sp)		;number of columns
@@ -80,7 +89,7 @@ checkNext:	jsr pc, nextKey			;calling nextKey
 			tst (sp)+				
 			
 			
-			;"Compare Images" - comparing the new encrypted image to the input encrypted image
+;"Compare Images" - comparing the new encrypted image to the input encrypted image using the cmpImg routine
 			mov #0, -(sp)			;space for cmpImg result
 			mov 16(sp), -(sp)		;passing input parameters for cmpImg in stack
 			mov 16(sp), -(sp)
@@ -95,7 +104,7 @@ checkNext:	jsr pc, nextKey			;calling nextKey
 			tst (sp)+
 			beq systemFin			;if identical jump to systemfinish
 			
-			;"Decrypt" - decrypting the new encrypted image (going back to the original input image)
+;"Decrypt" - decrypting the new encrypted image (going back to the original input image) using decrypt routine
 			mov 14(sp), -(sp)		;address of the picture
 			mov 12(sp), -(sp)		;number of rows
 			mov 12(sp), -(sp)		;number of columns
@@ -110,21 +119,20 @@ checkNext:	jsr pc, nextKey			;calling nextKey
 			
 systemFin:	mov (sp)+, r1			;restoring r1
 			rts pc					;done
-			
+;****************************************************************			
 
 
 
-
-
-
-
-
-
-			
-			;"nextKey" (Procedure) - changes the given key to the next key. the first node is increased by 1.
-			;if node 'i' is '17' it moves to '0' (only if is needs to be in icremented) and the next node 'i+1' is increased by 1.
-			;inputs - address of the start of key's list - in register r1
-			;outputs- next key - writen in the list that was passed as input in r1
+;**********************nextKey routine***************************			
+;steps:
+		;changes the given key to the next key. the first node is increased by 1.
+		;if node 'i' is '17' it moves to '0' (only if is needs to be in icremented) and the next node 'i+1' is increased by 1.
+;inputs:
+		;	- address of the start of key's list - in register r1
+;outputs:
+		;	- next key - writen in the list that was passed as input in r1
+;registers in use:
+		;	- r2
 nextKey:	mov r2, -(sp)			;pushing the content of r2 to the stack
 			mov r1, -(sp)			;pushing the address of the key to the stack
 			jsr pc, recurseKey		;calling recurseKey
@@ -132,9 +140,7 @@ nextKey:	mov r2, -(sp)			;pushing the content of r2 to the stack
 			mov (sp)+, r2			;restoring the content of r2 from the stack
 			rts pc
 			
-			
-
-			
+;"recurseKey" - recursivly advance the key in the list					
 recurseKey:	cmp @2(sp), #17		
 			beq nextCall			;if the key element equals 17 go to nextCall
 			inc @2(sp)				;if the key element does no equal 17 simply add 1
@@ -146,15 +152,24 @@ nextCall:	mov 0, @2(sp)			;key element = 0
 			jsr pc, recurseKey		;calling nextCall (recursion)
 			tst (sp)+				;popping the address that was delivered in stack
 finishKey:	rts pc					;return from recurseKey
+;****************************************************************
 
 
 
-
-
-
-
-
-	
+;**********************cmpImg routine****************************
+;steps:			
+		;compare two images, each byte is compared to the parallel byte in the other image
+;inputs: 
+			;		- address of the first image - in stack
+			;		- address of the second image - in stack
+			;		- number of rows in the image - in stack
+			;		- number of columns in the image - in stack
+;outputs:
+			;		- 0 for identical images, 1 otherwise - in stack before the inputs
+;registers in use:
+			;		- r0
+			;		- r1
+			;		- r2
 cmpImg:		mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp) 			;saving register values in stack
@@ -179,13 +194,23 @@ sameImg:	mov #0, 20(sp)			;output returns in stack
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
 			rts pc
-
+;****************************************************************
 			
 			
 			
-			
-			
-			
+;**********************isLegal routine***************************
+;steps:			
+		;check that each byte in a picture is within the range 0-17
+;inputs: 
+			;		- address of the image - inline
+			;		- number of rows in the image - inline
+			;		- number of columns in the image - inline
+;outputs:
+			;		- 0 for valid image, 1 otherwise - inline after the inputs
+;registers in use:
+			;		- r0
+			;		- r1
+			;		- r2					
 isLegal:	mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp) 			;saving register values in stack
@@ -210,26 +235,36 @@ legal:   	mov #0, (r5)+			;0 is returned when the picture is legal
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
 			rts r5
-
+;****************************************************************
+					
 			
-
-			
-			
-			
-			
-			
-			
-			
-			
-			;function encDec get parameters by stack and uses the pc for jsr.
-;the order of the parameters input is: flag(to encrypt is 1, to decrypt is 0), picture address, number of rows, number of columns,address of hash, key address.
+;**********************encDec routine***************************
+;steps:			
+		;performing encryption or decryption of an image according to input flag (1 and 0 accordingly)
+;inputs: 
+			;		- flag (to encrypt is 1, to decrypt is 0) - in stack
+			;		- the address of the image - in stack
+			;		- number of rows in the image - in stack
+			;		- number of columns in the image - in stack
+			;		- address of the scrumbling function
+			;		- address of the encryption key first node
+;outputs:
+			;		- an encrypted (or decreypted) image in place of the original image provided
+;registers in use:
+			;		- r0
+			;		- r1
+			;		- r2
+			;		- r3
+			;		- r4
+			;		- r5
 encDec:		mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp)
 			mov r3, -(sp)
 			mov r4, -(sp)
 			mov r5, -(sp)			;backing up the registers in stack	
-			
+
+;"call keyActivation" - calling keyActivation to activate the key on the given picture			
 			mov 26(sp), r0			;address of the image
 			mov 24(sp), r1			;number of rows to r1
 			mov 22(sp), r2			;number of columns to r2
@@ -249,7 +284,7 @@ encDec:		mov r0, -(sp)
 			bne Bytes
 
 		
-		
+;"ex2 scrumble" - scrumble (or un-scrumble the image in the method of byte scrumble, line scrumble, hash function scrumble		
 Lines:		movb 22(sp), r3			;r3 = start of current block pointer and no need to process line 0, r3 gets the columns
 			add 26(sp), r3			;now r3 points to the start of line 1, add to r3 the address of the image
 			movb #1, r1				;r1 is shift iterations counter, initialized with 1 for line 1
@@ -310,7 +345,8 @@ encBytes:	mov 20(sp), r3			;put hash starting address into r3
 			bne encBytes								
 			tstb 30(sp)				;if Enc=1 than after bytes encryption we need to do line encryption
 			bne Lines	
-				
+
+;"finishEncDec" - calling keyActivation again after the scrumbling		
 finishEncDec:	mov 26(sp), r0			;address of the image
 			mov 24(sp), r1			;number of rows to r1
 			mov 22(sp), r2			;number of columns to r2
@@ -318,10 +354,8 @@ finishEncDec:	mov 26(sp), r0			;address of the image
 			mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp)
-			mov r3, -(sp)			;set up input to keyActivation
-			
+			mov r3, -(sp)			;set up input to keyActivation			
 			jsr pc, keyActivation 	;after encryption or decryption we activate the secret key
-			
 			cmp (sp)+, (sp)+
 			cmp (sp)+, (sp)+		;clear stack
 			
@@ -333,14 +367,26 @@ finishEncDec:	mov 26(sp), r0			;address of the image
 			mov (sp)+, r0			;restoring registers
 			
 			rts pc
-
+;****************************************************************
 			
 			
 			
-			
-			
-			
-			
+;**********************encode routine****************************
+;steps:			
+		;performing encryption of an image:
+		;activate the encryption key on each byte
+		;scrumble the picture from previous step
+		;activate the encryption key on each byte of the image from previous step
+;inputs: 
+			;		- the address of the image - in stack
+			;		- number of rows in the image - in stack
+			;		- number of columns in the image - in stack
+			;		- address of the scrumbling function
+			;		- address of the encryption key first node
+;outputs:
+			;		- an encrypted image in place of the original image provided
+;registers in use:
+			;		- none
 encode:		mov #1, -(sp)			;flag for the encryption 
 			mov 14(sp), -(sp)		;address of the picture
 			mov 14(sp), -(sp)		;number of rows
@@ -352,17 +398,26 @@ encode:		mov #1, -(sp)			;flag for the encryption
 			cmp (sp)+, (sp)+
 			cmp (sp)+, (sp)+		;clear stack
 			rts pc
-
+;****************************************************************
 			
+					
 			
-			
-			
-			
-			
-			
-			
-			
-;helper function for decode: gets parameters in stack in the next order: address of the picture, rows, columns, hash, key
+;**********************decode routine****************************
+;steps:			
+		;performing decryption of an image:
+		;activate the encryption key on each byte
+		;un-scrumble the picture from previous step
+		;activate the encryption key on each byte of the image from previous step
+;inputs: 
+			;		- the address of the image - in stack
+			;		- number of rows in the image - in stack
+			;		- number of columns in the image - in stack
+			;		- address of the scrumbling function
+			;		- address of the encryption key first node
+;outputs:
+			;		- a decrypted image in place of the original image provided
+;registers in use:	
+			;		- none		
 decode:		mov #0, -(sp)			;flag for the encryption 
 			mov 14(sp), -(sp)		;address of the picture
 			mov 14(sp), -(sp)		;number of rows
@@ -374,18 +429,26 @@ decode:		mov #0, -(sp)			;flag for the encryption
 			cmp (sp)+, (sp)+
 			cmp (sp)+, (sp)+		;clear stack
 			rts pc
+;****************************************************************
 
 
 
-
-
-
-
-
-
-			
-;function keyActivation get parameters by stack and uses the pc for jsr.
-;the order of the parameters input is: picture address, number of rows, number of columns, key address.
+;**********************keyActivation routine*********************
+;steps:			
+		;activate the encryption key on each byte
+;inputs: 
+			;		- the address of the image - in stack
+			;		- number of rows in the image - in stack
+			;		- number of columns in the image - in stack
+			;		- address of the encryption key first node
+;outputs:
+			;		- a proccessed image (with the given key) in place of the provided image
+;registers in use:	
+			;		- r0
+			;		- r1
+			;		- r2
+			;		- r3
+			;		- r4			
 keyActivation: mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp)
@@ -417,36 +480,8 @@ keyFinished:	mov (sp)+, r4
 			mov (sp)+, r1
 			mov (sp)+, r0
 			rts pc					;return from function with the pc 
+;****************************************************************
 
-
-
-
-
-
-			
-			
+	
 finish:		halt
 		
-
-
-
-
-
-		
-.= torg + 11000
-nCols: 		.byte 10
-nRows: 	.byte 4
-OrigImg: 	.byte	 1,  2,  1,  2, 0,   1,   2,    3 
-				.byte	 3,  4,  3,  4, 4,   5,   6,    7
-				.byte	 5,  6,  5,  6, 10, 11, 12, 13
-				.byte	 7,  0,  7,  0, 14, 15, 16, 17
-EncImg: 	.byte	 3,  4,  3,  4,  2,  3,   4,    5 
-				.byte	 7,  4,  7,  4,  10,   7,   6,    11
-				.byte	 7,  10,  7,  10, 14, 15, 12, 13
-				.byte	 3,  10,  3,  10, 16, 1, 0, 17
-Hash:		.byte 	2,3,4,5,6,7,10,11,12,13,14,15,16,17,0,1
-.even
-Key:		
-node1:		.word -1, node2
-node2:		.word -1, node3
-node3:		.word -1, 0
