@@ -39,14 +39,22 @@ chkEncImg:	mov #EncImg, r1			;switch the address in r1 to the address of the enc
 			;"Using system" - finding the correct key using system subroutine
 			mov #OrigImg, -(sp)		;passing arguments in stack to system
 			mov #EncImg, -(sp)
-			mov nRows, -(sp)
-			mov nCols, -(sp)
+			clr -2(sp)
+			movb nRows, -(sp)
+			clr -2(sp)
+			movb nCols, -(sp)
 			mov #Hash, -(sp)
 			jsr pc, system
 			cmp (sp)+, (sp)+		;popping the stack - 5 inputs in stack and 0 outputs - 5 pops
 			cmp (sp)+, (sp)+
 			tst (sp)+
 			halt					;TO_DO: CHECK THAT THE STACK IS EMPTY IN THE END!
+
+
+
+
+
+
 			
 			;"System" (Procedure) - finds the key that was used to encrypt OrigImg the made EncImg.
 			;inputs - address of the original image - in stack
@@ -61,29 +69,57 @@ system:		mov r1, -(sp)			;saving r1 original value on stack
 checkNext:	jsr pc, nextKey			;calling nextKey
 
 			;"Encrypt" - encrypting the original image
-			
-			
-			;"Comapte Images" - comparing the new encrypted image to the input encrypted image
-			mov #0, -(sp)			;space for cmpImg result
-			mov #OrigImg, -(sp)		;passing input parameters for cmpImg in stack
-			mov #EncImg, -(sp)
-			clr -2(sp)
-			movb nRows, -(sp)
-			clr -2(sp)
-			movb nCols, -(sp)
-			jsr pc, cmpImg
-			cmp (sp)+, (sp)+		;popping the stack - 4 inputs and 0 outputs - 5 pops
+			mov 14(sp), -(sp)		;address of the original picture
+			mov 12(sp), -(sp)		;number of rows
+			mov 12(sp), -(sp)		;number of columns
+			mov 12(sp), -(sp)		;address of hash function
+			mov #Key, -(sp)			;address of the key
+			jsr pc, encode
+			cmp (sp)+, (sp)+		;popping the stack - 5 inputs in stack and 0 outputs - 5 pops
 			cmp (sp)+, (sp)+
+			tst (sp)+				
+			
+			
+			;"Compare Images" - comparing the new encrypted image to the input encrypted image
+			mov #0, -(sp)			;space for cmpImg result
+			mov 16(sp), -(sp)		;passing input parameters for cmpImg in stack
+			mov 16(sp), -(sp)
+			clr -2(sp)
+			movb 16(sp), -(sp)
+			clr -2(sp)
+			movb 16(sp), -(sp)
+			jsr pc, cmpImg
+			cmp (sp)+, (sp)+		;popping the stack - 4 inputs and 1 outputs - 4 pops
+			cmp (sp)+, (sp)+
+			
 			tst (sp)+
-						
 			beq systemFin			;if identical jump to systemfinish
 			
 			;"Decrypt" - decrypting the new encrypted image (going back to the original input image)
+			mov 14(sp), -(sp)		;address of the picture
+			mov 12(sp), -(sp)		;number of rows
+			mov 12(sp), -(sp)		;number of columns
+			mov 12(sp), -(sp)		;address of hash function
+			mov #Key, -(sp)		;address of the key
+			jsr pc, decode
+			cmp (sp)+, (sp)+		;popping the stack - 5 inputs in stack and 0 outputs - 5 pops
+			cmp (sp)+, (sp)+
+			tst (sp)+
 			
 			br checkNext			;stating another iteration of key checking proccess with the next key
 			
 systemFin:	mov (sp)+, r1			;restoring r1
-			halt					;done
+			rts pc					;done
+			
+
+
+
+
+
+
+
+
+
 			
 			;"nextKey" (Procedure) - changes the given key to the next key. the first node is increased by 1.
 			;if node 'i' is '17' it moves to '0' (only if is needs to be in icremented) and the next node 'i+1' is increased by 1.
@@ -94,69 +130,308 @@ nextKey:	mov r2, -(sp)			;pushing the content of r2 to the stack
 			jsr pc, recurseKey		;calling recurseKey
 			tst (sp)+				;popping 
 			mov (sp)+, r2			;restoring the content of r2 from the stack
-recurseKey:	cmp @2(sp), #17			
+			rts pc
+			
+			
+
+			
+recurseKey:	cmp @2(sp), #17		
 			beq nextCall			;if the key element equals 17 go to nextCall
 			inc @2(sp)				;if the key element does no equal 17 simply add 1
 			br finishKey			;go to finishKey
 nextCall:	mov 0, @2(sp)			;key element = 0
 			mov 2(sp), r2			;copy the address of the current key element to r2
-			add #2, r2				;add 2 to r2 - now r2 contains the address of the address of the adress of the next key element
+			add #2, r2				;add 2 to r2 - now r2 contains the address of the address of the next key element
 			mov (r2), -(sp)			;push the address of the next key element
 			jsr pc, recurseKey		;calling nextCall (recursion)
+			tst (sp)+				;popping the address that was delivered in stack
 finishKey:	rts pc					;return from recurseKey
-		
-cmpImg:		mov r0, -(sp)			;the picture isn't empty
+
+
+
+
+
+
+
+
+	
+cmpImg:		mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp) 			;saving register values in stack
-			mov 8(sp), r0 			;columns to register r0 - assuming that was saved in words
-			mov 10(sp), r1			;rows to register r1 - assuming that was saved in words
-			mul r1, r0				;number of bytes saved in r0
-			mov 14(sp), r1			;first picture address in r1
-			mov 12(sp), r2			;second picture address in r2
-cmpImgLoop:	cmpb (r1),(r2)			;comparing two bytes in a picture
+			mov 12(sp), r0 			;rows to register r0
+			mov 10(sp), r1			;columns to register r1
+			mul r0, r1				;number of bytes saved in r1
+			mov 16(sp), r0			;first picture address in r0
+			mov 14(sp), r2			;second picture address in r2
+cmpImgLoop:	cmpb (r0),(r2)			;comparing two bytes in a picture
 			bne notSameImg			
-			dec r0
+			dec r1
 			beq sameImg
-			cmpb (r1)+, (r2)+ 		;dummy just to advance the pointer to the next bytes of the picture
+			cmpb (r0)+, (r2)+ 		;dummy just to advance the pointer to the next bytes of the picture
 			br cmpImgLoop
-notSameImg:	mov #1, 16(sp)			;output returns in stack
+notSameImg:	mov #1, 20(sp)			;output returns in stack
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
 			rts pc
-sameImg:		mov #0, 16(sp)			;output returns in stack
+sameImg:	mov #0, 20(sp)			;output returns in stack
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
 			rts pc
 
-isLegal:		mov r0, -(sp)			;the picture isn't empty
+			
+			
+			
+			
+			
+			
+isLegal:	mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp) 			;saving register values in stack
 			mov (r5)+, r2			;picture's address moved to register r2 
-			mov (r5)+, r0 			;rows passing to r0 - assuming that was saved in words
-			mov (r5)+, r1			;columns passing to r1 - assuming that was saved in words
-			mul r0, r1		
-isLegalLoop:cmpb (r2), #17
-			bgt notLegal			;branch if bigger then 15 or smaller then 0
+			mov (r5)+, r0 			;rows passing to r0
+			mov (r5)+, r1			;columns passing to r1
+			mul r0, r1	
+isLegalLoop:	cmpb (r2), #17
+			bgt notLegal			;branch if bigger then 17
 			tstb (r2)+
-			blt notLegal
+			blt notLegal			;branch if lower than 0
 			dec r1
-			beq legal				;branch if r0 is 0 - picture is all scanned
+			beq legal				;branch if r1 is 0 - picture is all scanned
 			br isLegalLoop
-notLegal:	mov #1, (r5)+			;note that here 1 in returned when the picture is notLegal
+notLegal:	mov #1, (r5)+			;1 is returned when the picture is not legal
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0 			;restoring registers
 			rts r5
-legal:   	mov #0, (r5)+			;returning 0 when legal
+legal:   	mov #0, (r5)+			;0 is returned when the picture is legal
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0			;restoring registers
 			rts r5
+
+			
+
+			
+			
+			
+			
+			
+			
+			
+			
+			;function encDec get parameters by stack and uses the pc for jsr.
+;the order of the parameters input is: flag(to encrypt is 1, to decrypt is 0), picture address, number of rows, number of columns,address of hash, key address.
+encDec:		mov r0, -(sp)
+			mov r1, -(sp)
+			mov r2, -(sp)
+			mov r3, -(sp)
+			mov r4, -(sp)
+			mov r5, -(sp)			;backing up the registers in stack	
+			
+			mov 26(sp), r0			;address of the image
+			mov 24(sp), r1			;number of rows to r1
+			mov 22(sp), r2			;number of columns to r2
+			mov 16(sp), r3			;address of key to r3
+			mov r0, -(sp)
+			mov r1, -(sp)
+			mov r2, -(sp)
+			mov r3, -(sp)			;set up input to keyActivation
+			clr r0
+			clr r1
+			clr r2
+			clr r3 
+			jsr pc, keyActivation		;before encryption or decryption we activate the secret key
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+			;clears stack 
+			tstb 30(sp)					;if 1 than first encrypt bytes than encrypt lines, else if 0 first decrypt lines than decrypt bytes
+			bne Bytes
+
+		
+		
+Lines:		movb 22(sp), r3			;r3 = start of current block pointer and no need to process line 0, r3 gets the columns
+			add 26(sp), r3			;now r3 points to the start of line 1, add to r3 the address of the image
+			movb #1, r1				;r1 is shift iterations counter, initialized with 1 for line 1
+lineloop:	movb 22(sp), r0			;r0 = number of columns in each row act as counter of blocks to process
+blocksloop:	clr r5					;r5 acts as per block shift iterations counter
+			tstb 30(sp)				;test flag 			
+			beq shiftleft			;for encrypt shiftright for decrypt shiftleft
+shiftright:	movb (r3), r4			;r4 acts as swap temp register
+			movb 3(r3), (r3)
+			movb 2(r3), 3(r3)
+			movb 1(r3), 2(r3)
+			movb r4, 1(r3)
+			add #1, r5				;add 1 to shift iterations on this line
+			cmpb r1, r5				;if the number of iterations equals line number than we are finished for this block
+			bne shiftright		
+			br aftershift			;skipping shiftleft for encryption
+shiftleft:	movb 3(r3), r4			;r4 acts as swap temp register
+			movb (r3), 3(r3)
+			movb 1(r3), (r3)
+			movb 2(r3), 1(r3)
+			movb r4, 2(r3)
+			add #1, r5				;add 1 to shift iterations on this line
+			cmpb r1, r5				;if the number of iterations equals line number than we are finished for this block
+			bne shiftleft		
+aftershift:	add #4, r3				;add number of columns to point to the start of the next block
+			sub #4, r0				;each block we finished is 4 columns to process
+			bne blocksloop			;if block counter not 0 than we have more blocks to process in this line
+			add #1, r1				;indicating that next line to be processed is current line +1
+			cmpb 24(sp), r1			;did you finish the last line, number of the rows to r1
+			bpl lineloop				;if next line is valid than process it
+			tstb 30(sp)				;if Enc=1 than we finished after lines encrypt, otherwise Enc=0 continue to decrypt bytes
+			bne finishEncDec
+		
+Bytes:		movb 22(sp), r0			;number of columns to r0		
+			movb 24(sp), r1			;number of rows to r1
+			mul r0, r1
+			mov 26(sp), r2			;address of the image to r2
+			tstb 30(sp)				;if Enc is 1 then we need to encrypt, else we after lines decrypt and we need to decrypt bytes
+			bne encBytes
+			
+decBytes:	mov 20(sp), r3			;put hash starting address into r3
+			add #-1,r3			
+			movb #-1, r4			;set r4 into -1, while r4 is the iterator
+bytesLoop:	add #1, r4				;add 1 to r4, each loop iteration
+			add #1, r3				;add 1 to hash adrress in order to iterate over the hash 
+			cmpb (r3), (r2)			;compare if the hash in the i place is equals to the number in the encrypted output
+			bne bytesLoop			;if not equal run again 
+			movb r4, (r2)+			;if equal put the iterator into the output and advance it 
+			sub #1, r1				;subtract one from the total runs 
+			bne decBytes			
+			br finishEncDec				;if decryption is finish we are done		
+
+encBytes:	mov 20(sp), r3			;put hash starting address into r3
+			movb (r2), r4
+			add r4, r3
+			movb (r3), (r2)+
+			sub #1, r1
+			bne encBytes								
+			tstb 30(sp)				;if Enc=1 than after bytes encryption we need to do line encryption
+			bne Lines	
+				
+finishEncDec:	mov 26(sp), r0			;address of the image
+			mov 24(sp), r1			;number of rows to r1
+			mov 22(sp), r2			;number of columns to r2
+			mov 16(sp), r3			;address of key to r3
+			mov r0, -(sp)
+			mov r1, -(sp)
+			mov r2, -(sp)
+			mov r3, -(sp)			;set up input to keyActivation
+			
+			jsr pc, keyActivation 	;after encryption or decryption we activate the secret key
+			
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+		;clear stack
+			
+			mov (sp)+, r5
+			mov (sp)+, r4
+			mov (sp)+, r3
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0			;restoring registers
+			
+			rts pc
+
+			
+			
+			
+			
+			
+			
+			
+encode:		mov #1, -(sp)			;flag for the encryption 
+			mov 14(sp), -(sp)		;address of the picture
+			mov 14(sp), -(sp)		;number of rows
+			mov 14(sp), -(sp)		;number of columns
+			mov 14(sp), -(sp)		;address of hash function
+			mov 14(sp), -(sp)		;address of the key (setting the inputs of encDec)
+			jsr pc, encDec
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+		;clear stack
+			rts pc
+
+			
+			
+			
+			
+			
+			
+			
+			
+			
+;helper function for decode: gets parameters in stack in the next order: address of the picture, rows, columns, hash, key
+decode:		mov #0, -(sp)			;flag for the encryption 
+			mov 14(sp), -(sp)		;address of the picture
+			mov 14(sp), -(sp)		;number of rows
+			mov 14(sp), -(sp)		;number of columns
+			mov 14(sp), -(sp)		;address of hash function
+			mov 14(sp), -(sp)		;address of the key (setting the inputs of encDec)
+			jsr pc, encDec
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+
+			cmp (sp)+, (sp)+		;clear stack
+			rts pc
+
+
+
+
+
+
+
+
+
+			
+;function keyActivation get parameters by stack and uses the pc for jsr.
+;the order of the parameters input is: picture address, number of rows, number of columns, key address.
+keyActivation: mov r0, -(sp)
+			mov r1, -(sp)
+			mov r2, -(sp)
+			mov r3, -(sp)
+			mov r4, -(sp)
+			mov 16(sp), r0			;number of columns to r0
+			mov 20(sp), r1			;number of rows to r1
+			mul r0, r1				;total number bytes in the picture to r1
+			mov 22(sp), r0			;picture's address to r0
+keyStart:	mov 14(sp), r2			;putting the address of the key to r2
+keyIteretion:	mov (r2)+, r3 			;putting the element of the node in r3 and progress the pointer to the next node address
+			clr r4
+			movb (r0), r4			;no byte operation of xor then we use another register r4
+			xor r3, r4
+			movb r4, (r0)+			;xor between key and the byte of the picture and progress the pointer of picture		
+			dec r1
+			tst r1 
+			beq keyFinished
+			tst (r2)
+			beq keyStart
+			mov (r2),r4				;address of next node in r4
+			cmp (r4), #-1			;if the next key element is -1 then go to key start
+			beq keyStart
+			mov r4, r2
+			br keyIteretion
+keyFinished:	mov (sp)+, r4
+			mov (sp)+, r3
+			mov (sp)+, r2
+			mov (sp)+, r1
+			mov (sp)+, r0
+			rts pc					;return from function with the pc 
+
+
+
+
+
+
+			
 			
 finish:		halt
 		
+
+
+
+
+
 		
 .= torg + 11000
 nCols: 		.byte 10
