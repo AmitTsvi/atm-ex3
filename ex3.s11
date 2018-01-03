@@ -448,40 +448,83 @@ decode:		mov #0, -(sp)			;flag for the encryption
 			;		- r1
 			;		- r2
 			;		- r3
-			;		- r4			
+			;		- r4
+			;		- r5
 keyActivation: mov r0, -(sp)
 			mov r1, -(sp)
 			mov r2, -(sp)
 			mov r3, -(sp)
 			mov r4, -(sp)
-			mov 16(sp), r0			;number of columns to r0
-			mov 20(sp), r1			;number of rows to r1
+			mov r5, -(sp)
+			
+			mov 20(sp), r1			;number of columns to r1
+			clr r0
+			div #4, r0				;r0 = number of blocks in each image-line (columns/4)
+			mov r0, -(sp)			;save this number in the stack
+			
+			mov 22(sp), r0			;number of columns to r0
+			mov 24(sp), r1			;number of rows to r1
 			mul r0, r1				;total number bytes in the picture to r1
-			mov 22(sp), r0			;picture's address to r0
-keyStart:	mov 14(sp), r2			;putting the address of the key to r2
-keyIteretion:	mov (r2)+, r3 			;putting the element of the node in r3 and progress the pointer to the next node address
+			mov r1, -(sp)			;save this number in the stack
+
+			mov #0, r1				;counter of bytes in a block (0-16(decimal))
+			mov #0, r5				;counter of blocks in a line of a image (0 - 2(sp))
+			
+			mov 30(sp), r0			;picture's address to r0
+keyStart:	mov 22(sp), r2			;putting the address of the key to r2
+keyIteretion:	mov (r2)+, r3 		;putting the element of the node in r3 and progress the pointer to the next node address
 			clr r4
-			movb (r0), r4			;no byte operation of xor then we use another register r4
+			movb (r0), r4			;put the current byte of the picture in r4
 			xor r3, r4
-			movb r4, (r0)+			;xor between key and the byte of the picture and progress the pointer of picture		
-			dec r1
-			tst r1 
+			movb r4, (r0)			;put the new value after xor in place of the original byte in the image		
+			inc r1					;add 1 to counter of bytes in a block
+			mov r1, r4
+			asr r4
+			bcs	notEven			;if the counter of bytes in a block is not even then it is not line finish
+			asr r4
+			bcc nextLine			;if the counter of bytes in a block divided by 4 has a reminder then it is not line finish
+notEven:	inc r0
+			br keyContinue
+nextLine:	cmp #20, r1				
+			beq	nextBlock			;finished a block
+			add 24(sp), r0
+			sub #3, r0				;to advance to the start of the next line - r0 = r0+nCols-3
+			br keyContinue
+nextBlock:	inc r5					;add 1 to counter of blocks in a line of a image
+			mov #0, r1				;initialize counter of bytes in a block
+			cmp r5, 2(sp)
+			beq nextImageLine
+			sub 24(sp), r0
+			sub 24(sp), r0
+			sub 24(sp), r0
+			inc r0					;to advance to the start of the next block in the same image-line - r0 = r0-3*nCols+1
+			br keyStart				;finished a block so need to start from the begining of the key
+nextImageLine:	mov #0, r5			;initialize counter of blocks in a line of a image
+			mov (sp), r3			; r3 = number of bytes in image
+			mov r0, r4				; r4 = address of the current byte
+			inc r4
+			sub r3, r4				; if it is the last byte in picture then after this command r4 = address of begining of image
+			cmp 30(sp), r4
 			beq keyFinished
-			tst (r2)
+			inc r0					;to advance to the start of the first block in the next image-line - r0 = r0+1
+			br keyStart			
+keyContinue:	tst (r2)
 			beq keyStart
 			mov (r2),r4				;address of next node in r4
 			cmp (r4), #-1			;if the next key element is -1 then go to key start
-			beq keyStart
-			mov r4, r2
+			beq keyStart			;finished a block so need to start from the begining of the key
+			mov r4, r2				;address of the next node in r2
 			br keyIteretion
-keyFinished:	mov (sp)+, r4
+keyFinished:	cmp (sp)+, (sp)+	;clear of storage space
+			mov (sp)+, r5	
+			mov (sp)+, r4
 			mov (sp)+, r3
 			mov (sp)+, r2
 			mov (sp)+, r1
 			mov (sp)+, r0
 			rts pc					;return from function with the pc 
 ;****************************************************************
-
 	
 finish:		halt
+		
 		
